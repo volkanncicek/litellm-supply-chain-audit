@@ -36,7 +36,11 @@ print(json.dumps({"executable": sys.executable, "site_packages": paths}))
 """
 
 
-def _safe_run_python(python: Path, timeout: float = 30.0) -> dict | None:
+def _safe_run_python(
+    python: Path,
+    timeout: float = 5.0,
+    verbose: bool = False,
+) -> dict | None:
     try:
         proc = subprocess.run(
             # -S disables importing `site` at startup; this avoids executing `.pth` files.
@@ -48,8 +52,12 @@ def _safe_run_python(python: Path, timeout: float = 30.0) -> dict | None:
             errors="replace",
         )
     except (OSError, subprocess.TimeoutExpired):
+        if verbose:
+            print(f"[discovery] Failed to query python: {python}", file=sys.stderr)
         return None
     if proc.returncode != 0 or not proc.stdout.strip():
+        if verbose:
+            print(f"[discovery] Python returned no site info: {python}", file=sys.stderr)
         return None
     try:
         return json.loads(proc.stdout.strip().splitlines()[-1])
@@ -297,6 +305,8 @@ def collect_python_candidates(
 def discover_environments(
     scan_roots: list[Path] | None = None,
     venv_walk_depth: int = 8,
+    verbose: bool = False,
+    python_info_timeout_seconds: float = 5.0,
 ) -> list[dict]:
     """
     Return list of { "python": str, "site_packages": [str, ...] } for each working interpreter.
@@ -307,7 +317,7 @@ def discover_environments(
     seen_sp: set[str] = set()
 
     for py in candidates:
-        data = _safe_run_python(py)
+        data = _safe_run_python(py, timeout=python_info_timeout_seconds, verbose=verbose)
         if not data:
             continue
         exe = data.get("executable")

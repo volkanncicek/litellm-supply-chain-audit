@@ -36,6 +36,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
             "(default: 4; 0 disables)"
         ),
     )
+    p.add_argument(
+        "--pth-max-hits",
+        type=int,
+        default=50,
+        help="Maximum number of litellm_init.pth IOC findings to keep (default: 50).",
+    )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print progress and skipped-path info to stderr.",
+    )
     p.add_argument("--no-docker", action="store_true", help="Skip Docker image name scan")
     p.add_argument("--no-processes", action="store_true", help="Skip process/socket scan")
     p.add_argument("--json-only", action="store_true", help="Print JSON report to stdout only")
@@ -43,6 +54,30 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--no-report-file",
         action="store_true",
         help="Do not write litellm-supply-chain-audit-*.json",
+    )
+    p.add_argument(
+        "--cache-max-files",
+        type=int,
+        default=100_000,
+        help="Cache scanner hard cap for visited filenames (budget is split across cache roots).",
+    )
+    p.add_argument(
+        "--cache-max-hits",
+        type=int,
+        default=200,
+        help="Cache scanner maximum number of findings to keep.",
+    )
+    p.add_argument(
+        "--python-info-timeout-seconds",
+        type=float,
+        default=5.0,
+        help="Timeout for subprocess calls used to discover site-packages (default: 5s).",
+    )
+    p.add_argument(
+        "--docker-timeout-seconds",
+        type=float,
+        default=15.0,
+        help="Timeout for `docker image ls` (default: 15s).",
     )
     p.add_argument(
         "--report-dir",
@@ -71,8 +106,14 @@ def main(argv: list[str] | None = None) -> None:
         scan_root=root,
         venv_walk_depth=args.venv_walk_depth,
         pth_max_depth=args.pth_max_depth,
+        pth_max_hits=args.pth_max_hits,
         skip_docker=args.no_docker,
         skip_processes=args.no_processes,
+        verbose=bool(args.verbose),
+        cache_max_files=args.cache_max_files,
+        cache_max_hits=args.cache_max_hits,
+        python_info_timeout_seconds=args.python_info_timeout_seconds,
+        docker_timeout_seconds=args.docker_timeout_seconds,
     )
 
     try:

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import sys
 
 from .constants import (
     FS_WALK_SKIP_DIRS_COMMON,
@@ -23,7 +24,7 @@ def _should_skip_dir(name: str) -> bool:
     return name in FS_WALK_SKIP_DIRS_COMMON or name in extra
 
 
-def find_pth_in_site_packages(site_package_dirs: list[str]) -> list[dict]:
+def find_pth_in_site_packages(site_package_dirs: list[str], verbose: bool = False) -> list[dict]:
     """Fast IOC check: only `site-packages/litellm_init.pth` (typical install location)."""
     findings: list[dict] = []
     seen: set[str] = set()
@@ -46,15 +47,18 @@ def find_pth_in_site_packages(site_package_dirs: list[str]) -> list[dict]:
                     "source": "site-packages",
                 }
             )
-        except OSError:
+        except OSError as e:
+            if verbose:
+                print(f"[pth-ioc] Skipped unreadable: {p} ({e})", file=sys.stderr)
             continue
     return findings
 
 
 def find_litellm_init_pth(
     root: Path,
-    max_depth: int = 12,
+    max_depth: int = 4,
     max_hits: int = 50,
+    verbose: bool = False,
 ) -> list[dict]:
     """
     Depth-limited search for `litellm_init.pth` under `root`.
@@ -69,7 +73,9 @@ def find_litellm_init_pth(
             return
         try:
             entries = list(cur.iterdir())
-        except OSError:
+        except OSError as e:
+            if verbose:
+                print(f"[pth-ioc] Cannot access dir: {cur} ({e})", file=sys.stderr)
             return
         for p in entries:
             if len(findings) >= max_hits:
@@ -89,7 +95,9 @@ def find_litellm_init_pth(
                             "snippet_preview": snippet[:500],
                         }
                     )
-            except OSError:
+            except OSError as e:
+                if verbose:
+                    print(f"[pth-ioc] Skipped entry: {p} ({e})", file=sys.stderr)
                 continue
 
     if root.is_dir():
@@ -122,7 +130,7 @@ def scan_hosts_file_for_ioc() -> dict:
     return {"status": "ok", "path": str(hosts), "matched_lines": lines[:20]}
 
 
-def find_pth_in_system_locations(max_hits: int = 50) -> list[dict]:
+def find_pth_in_system_locations(max_hits: int = 50, verbose: bool = False) -> list[dict]:
     """
     Search common system Python locations for litellm_init.pth outside scan_root.
     """
@@ -143,7 +151,7 @@ def find_pth_in_system_locations(max_hits: int = 50) -> list[dict]:
     for root in roots:
         if not root.is_dir():
             continue
-        for hit in find_litellm_init_pth(root, max_depth=6, max_hits=max_hits):
+        for hit in find_litellm_init_pth(root, max_depth=6, max_hits=max_hits, verbose=verbose):
             path_key = str(hit.get("path", ""))
             if not path_key or path_key in seen:
                 continue

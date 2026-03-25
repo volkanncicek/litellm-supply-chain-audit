@@ -12,7 +12,13 @@ PACKAGE_NAME: str = "litellm"
 FS_WALK_SKIP_DIRS_COMMON: frozenset[str] = frozenset(
     {
         ".git",
+        ".idea",
+        ".vscode",
+        ".next",
         "node_modules",
+        "vendor",
+        ".rustup",
+        ".cargo",
         "__pycache__",
         ".tox",
         "dist",
@@ -43,25 +49,22 @@ PROJECT_VENV_DIR_NAMES: tuple[str, ...] = (
     ".venv",
     "venv",
     "env",
-    ".env",
     ".virtualenv",
     ".conda",
 )
 
-VENV_WALK_SKIP_DIRS: frozenset[str] = frozenset(
+VENV_WALK_EXTRA_SKIP_DIRS: frozenset[str] = frozenset(
     {
-        ".git",
-        "node_modules",
-        "__pycache__",
-        ".tox",
         ".mypy_cache",
         ".pytest_cache",
         ".ruff_cache",
         ".cache",
-        "dist",
-        "build",
     }
 )
+
+# Keep venv discovery pruning consistent with general FS pruning,
+# then add venv-specific caches.
+VENV_WALK_SKIP_DIRS: frozenset[str] = FS_WALK_SKIP_DIRS_COMMON | VENV_WALK_EXTRA_SKIP_DIRS
 
 CONDA_HOME_DIR_NAMES: tuple[str, ...] = ("miniconda3", "anaconda3", "mambaforge", "miniforge3")
 

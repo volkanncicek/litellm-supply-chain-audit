@@ -1,6 +1,7 @@
 """Orchestrate all scan phases and compute exit code."""
 
 import json
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,9 +32,15 @@ from .processes import scan_processes_and_network
 class ScanConfig:
     scan_root: Path
     pth_max_depth: int = 4
+    pth_max_hits: int = 50
     venv_walk_depth: int = 8
     skip_docker: bool = False
     skip_processes: bool = False
+    verbose: bool = False
+    cache_max_files: int = 100_000
+    cache_max_hits: int = 200
+    python_info_timeout_seconds: float = 5.0
+    docker_timeout_seconds: float = 15.0
 
 
 def _severity(
@@ -62,34 +69,56 @@ def _severity(
 
 
 def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
+    def _log(msg: str) -> None:
+        if config.verbose:
+            print(msg, file=sys.stderr)
+
     root = config.scan_root.expanduser().resolve()
     scan_roots = [root] if root.is_dir() else []
 
     phases: dict[str, Any] = {}
 
-    envs = discover_environments(scan_roots=scan_roots, venv_walk_depth=config.venv_walk_depth)
+    _log("[1/8] Discover Python environments...")
+    envs = discover_environments(
+        scan_roots=scan_roots,
+        venv_walk_depth=config.venv_walk_depth,
+        verbose=config.verbose,
+        python_info_timeout_seconds=config.python_info_timeout_seconds,
+    )
     phases["python_environments"] = {"count": len(envs), "environments": envs}
 
+    _log("[2/8] Scan installed litellm versions...")
     installed = scan_installed_in_environments(envs)
     phases["installed_litellm"] = installed
     phases["indirect_installed_dependency"] = scan_indirect_dependency_in_environments(envs)
 
+    _log("[3/8] Scan dependency manifests under scan_root...")
     dep_hits: list[dict] = []
     if root.is_dir():
         dep_hits = scan_dependency_files(root)
     phases["dependency_files"] = dep_hits
 
-    cache_hits = scan_package_caches()
+    _log("[4/8] Scan pip/uv/Poetry/Hatch caches...")
+    cache_hits = scan_package_caches(
+        max_files=config.cache_max_files,
+        max_hits=config.cache_max_hits,
+    )
     phases["pip_uv_cache"] = cache_hits
 
     site_dirs: list[str] = []
     for e in envs:
         site_dirs.extend(e.get("site_packages") or [])
-    pth_fast = find_pth_in_site_packages(site_dirs)
+    _log("[5/8] Scan litellm_init.pth IOC...")
+    pth_fast = find_pth_in_site_packages(site_dirs, verbose=config.verbose)
     pth_slow: list[dict] = []
-    pth_system = find_pth_in_system_locations()
+    pth_system = find_pth_in_system_locations(
+        max_hits=config.pth_max_hits,
+        verbose=config.verbose,
+    )
     if config.pth_max_depth > 0 and root.is_dir():
-        pth_slow = find_litellm_init_pth(root, max_depth=config.pth_max_depth)
+        pth_slow = find_litellm_init_pth(
+            root, max_depth=config.pth_max_depth, max_hits=config.pth_max_hits, verbose=config.verbose
+        )
     seen_pth: set[str] = set()
     pth_hits: list[dict] = []
     for row in pth_fast + pth_slow + pth_system:
@@ -102,6 +131,7 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
 
     net_danger = False
     if not config.skip_processes:
+        _log("[6/9] Scan processes / network...")
         proc = scan_processes_and_network()
         phases["processes_and_network"] = proc
         if proc.get("status") == "ok":
@@ -112,13 +142,15 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
     else:
         phases["processes_and_network"] = {"status": "skipped", "reason": "--no-processes"}
 
+    _log("[7/8] Scan hosts file IOC...")
     hosts = scan_hosts_file_for_ioc()
     phases["hosts_ioc"] = hosts
     hosts_ioc = bool(hosts.get("matched_lines") or [])
 
     docker_danger = False
     if not config.skip_docker:
-        docker = scan_docker_images()
+        _log("[8/8] Scan Docker image tags...")
+        docker = scan_docker_images(timeout_seconds=config.docker_timeout_seconds)
         phases["docker"] = docker
         docker_danger = bool(docker.get("compromised_images"))
     else:
@@ -199,7 +231,7 @@ def report_to_text(report: dict[str, Any]) -> str:
         lines.append(f"        - {row.get('package')} ({row.get('python')})")
 
     cache = phases.get("pip_uv_cache") or []
-    lines.append(f"[4/7] pip/uv cache (suspicious filenames): {len(cache)}")
+    lines.append(f"[4/7] pip/uv/Poetry/Hatch cache (suspicious filenames): {len(cache)}")
 
     pth = phases.get("pth_ioc") or []
     lines.append(f"[5/7] litellm_init.pth IOC: {len(pth)}")

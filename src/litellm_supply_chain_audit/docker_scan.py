@@ -24,20 +24,20 @@ def _docker_daemon_unreachable(stderr: str) -> bool:
     return any(n in s for n in needles)
 
 
-def scan_docker_images() -> dict[str, Any]:
+def scan_docker_images(timeout_seconds: float = 15.0) -> dict[str, Any]:
     try:
         proc = subprocess.run(
             ["docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=timeout_seconds,
             encoding="utf-8",
             errors="replace",
         )
     except FileNotFoundError:
         return {"status": "skipped", "reason": "docker CLI not found in PATH"}
     except subprocess.TimeoutExpired:
-        return {"status": "error", "reason": "docker image ls timed out"}
+        return {"status": "error", "reason": f"docker image ls timed out after {timeout_seconds}s"}
 
     if proc.returncode != 0:
         err = (proc.stderr or proc.stdout or "").strip()

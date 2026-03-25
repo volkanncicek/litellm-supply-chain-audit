@@ -35,7 +35,7 @@
 | 1 | Environments | Heuristic discovery: `PATH` / Windows `py`, common prefixes, pyenv/conda/homebrew-style paths, explicit Python `3.10`–`3.14` install paths (including `Program Files` and `Program Files (x86)`), and `.venv` / `venv` / `env` / `.env` / `.virtualenv` / `.conda` under the scan root (not every niche layout). Discovery runs Python with `-S` (no `site` import) to avoid executing any `.pth` side effects. |
 | 2 | Installed packages | Reads `litellm-*.dist-info/METADATA` and `litellm-*.egg-info/PKG-INFO` only—**no `import litellm`**. Flags **1.82.7 / 1.82.8** and also reports any installed package metadata that declares `Requires-Dist: litellm`. |
 | 3 | Manifests | `pyproject.toml` dependency tables; line scan of `requirements*.txt`, Pipfile, lockfiles, `setup.py` / `setup.cfg`, etc. |
-| 4 | pip / uv cache | Known cache locations; filenames suggesting **1.82.7 / 1.82.8** artifacts. |
+| 4 | pip / uv / Poetry / Hatch cache | Known cache locations; filenames suggesting **1.82.7 / 1.82.8** artifacts. |
 | 5 | `.pth` IOC | Fast: `litellm_init.pth` beside discovered `site-packages`; also checks common system Python locations. For deeper scanning under `scan_root`, set **`--pth-max-depth > 0`**. |
 | 6 | Processes / network | **psutil**: command lines mentioning `litellm`; connections to the known malicious host when the OS exposes them; plus `hosts` file IOC line check for `models.litellm.cloud`. |
 | 7 | Docker | **`docker image ls`**—name/tag match only; no layer inspection. Detects `litellm` tags containing **1.82.7 / 1.82.8** as danger. Skipped if the daemon is down; use **`--no-docker`** to skip the CLI call. |
@@ -119,6 +119,12 @@ litellm-supply-chain-audit --no-processes --no-docker
 | `scan_root` | Optional; default: user home |
 | `--venv-walk-depth N` | Depth-limited venv discovery under `scan_root` via `pyvenv.cfg` (default **8**; `0` disables) |
 | `--pth-max-depth N` | Recursive `litellm_init.pth` search depth under `scan_root` (default **4**; `0` disables) |
+| `--pth-max-hits N` | Maximum number of `litellm_init.pth` IOC findings to keep |
+| `--verbose` | Print progress and skipped-path info to stderr |
+| `--cache-max-files N` | Cache scanner hard cap for visited filenames |
+| `--cache-max-hits N` | Cache scanner maximum number of findings to keep |
+| `--python-info-timeout-seconds T` | Timeout for subprocess calls used to discover site-packages |
+| `--docker-timeout-seconds T` | Timeout for `docker image ls` |
 | `--no-docker` | Skip Docker |
 | `--no-processes` | Skip process/socket phase |
 | `--json-only` | Print JSON only |

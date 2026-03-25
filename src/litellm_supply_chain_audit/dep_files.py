@@ -5,7 +5,12 @@ import re
 import tomllib
 from pathlib import Path
 
-from .constants import DEPENDENCY_MANIFEST_FILE_NAMES, FS_WALK_SKIP_DIRS_COMMON, PACKAGE_NAME
+from .constants import (
+    DEPENDENCY_MANIFEST_FILE_NAMES,
+    FS_WALK_SKIP_DIRS_COMMON,
+    PACKAGE_NAME,
+    PROJECT_VENV_DIR_NAMES,
+)
 
 # PEP 508 name at start of requirement line
 _RE_REQ = re.compile(rf"(?i)^{re.escape(PACKAGE_NAME)}([\s\[<>=!~,;]|$)")
@@ -90,7 +95,11 @@ def scan_dependency_files(root: Path, max_files: int = 5000) -> list[dict]:
     count = 0
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-        dirnames[:] = [d for d in dirnames if d not in FS_WALK_SKIP_DIRS_COMMON]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in FS_WALK_SKIP_DIRS_COMMON and d not in PROJECT_VENV_DIR_NAMES
+        ]
         for name in filenames:
             if count >= max_files:
                 return findings
