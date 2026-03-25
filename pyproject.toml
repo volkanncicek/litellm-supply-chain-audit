@@ -1,0 +1,37 @@
+[project]
+name = "litellm-supply-chain-audit"
+version = "0.1.0"
+description = "Cross-platform Python utility to audit local environments for the March 2026 litellm supply-chain incident (IOC + known-bad versions)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["litellm", "security", "supply-chain", "pypi", "audit"]
+dependencies = [
+    "psutil>=6.0.0",
+]
+authors = [{ name = "Volkan Çiçek", email = "volkanciicek@gmail.com" }]
+
+[project.urls]
+Homepage = "https://github.com/volkanncicek/litellm-supply-chain-audit"
+Repository = "https://github.com/volkanncicek/litellm-supply-chain-audit"
+Issues = "https://github.com/volkanncicek/litellm-supply-chain-audit/issues"
+
+[project.scripts]
+litellm-supply-chain-audit = "litellm_supply_chain_audit.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/litellm_supply_chain_audit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/litellm_supply_chain_audit", "README.md", "LICENSE"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
