@@ -19,14 +19,37 @@ def version_from_metadata_file(metadata_path: Path) -> str | None:
 
 def _iter_litellm_metadata_files(site_packages: Path) -> list[Path]:
     files: list[Path] = []
-    for pattern, name in (
-        (f"{PACKAGE_NAME}-*.dist-info", "METADATA"),
-        (f"{PACKAGE_NAME}-*.egg-info", "PKG-INFO"),
-    ):
-        for info_dir in site_packages.glob(pattern):
-            if not info_dir.is_dir():
-                continue
-            meta = info_dir / name
+
+    # On some hosts, dist-info / egg-info directories may be created with
+    # unexpected casing (e.g. LiteLLM-...-dist-info). Use case-insensitive
+    # matching to avoid missing installed versions.
+    try:
+        entries = list(site_packages.iterdir())
+    except OSError:
+        return files
+
+    pkg = PACKAGE_NAME.casefold()
+
+    for info_dir in entries:
+        if not info_dir.is_dir():
+            continue
+        lowered = info_dir.name.casefold()
+
+        # Per packaging's "recording installed projects" spec, `.dist-info` is
+        # named `{name}-{version}.dist-info`, i.e. the separator between name
+        # and version is always `-` (with additional normalization).
+        if lowered.endswith(".dist-info") and lowered.startswith(pkg + "-"):
+            meta = info_dir / "METADATA"
+            if meta.is_file():
+                files.append(meta)
+            continue
+
+        # `.egg-info` is legacy; different installers have historically used
+        # either `{name}-{version}.egg-info` or `{name}.egg-info`.
+        if lowered.endswith(".egg-info") and (
+            lowered.startswith(pkg + "-") or lowered.startswith(pkg + ".")
+        ):
+            meta = info_dir / "PKG-INFO"
             if meta.is_file():
                 files.append(meta)
     return files

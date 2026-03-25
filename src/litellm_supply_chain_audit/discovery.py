@@ -81,12 +81,30 @@ def _dedupe_paths(paths: list[Path]) -> list[Path]:
 
 
 def _windows_python_candidates() -> list[Path]:
+    def _walk_python_executables(root: Path, max_hits: int = 5000) -> list[Path]:
+        """Walk `root` and find `python.exe` while pruning noisy directories."""
+        found: list[Path] = []
+        if not root.is_dir():
+            return found
+
+        for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+            # Prune directories that are unlikely to contain Python interpreters.
+            dirnames[:] = [d for d in dirnames if d not in VENV_WALK_SKIP_DIRS]
+
+            if "python.exe" in filenames:
+                p = Path(dirpath) / "python.exe"
+                if p.is_file():
+                    found.append(p)
+                    if len(found) >= max_hits:
+                        return found
+        return found
+
     found: list[Path] = []
     local = os.environ.get("LOCALAPPDATA", "")
     if local:
         base = Path(local) / "Programs" / "Python"
         if base.is_dir():
-            found.extend(base.rglob("python.exe"))
+            found.extend(_walk_python_executables(base))
     pf = os.environ.get("ProgramFiles", "")
     if pf:
         for minor in SUPPORTED_PYTHON_MINOR_VERSIONS:
@@ -109,11 +127,11 @@ def _windows_python_candidates() -> list[Path]:
     if pipx:
         p = Path(pipx) / "venvs"
         if p.is_dir():
-            found.extend(p.rglob("python.exe"))
+            found.extend(_walk_python_executables(p))
     else:
         default_pipx = Path.home() / "pipx" / "venvs"
         if default_pipx.is_dir():
-            found.extend(default_pipx.rglob("python.exe"))
+            found.extend(_walk_python_executables(default_pipx))
     return found
 
 
