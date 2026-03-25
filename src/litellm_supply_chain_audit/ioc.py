@@ -1,8 +1,8 @@
 """Search for malicious .pth IOC files."""
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from .constants import (
     FS_WALK_SKIP_DIRS_COMMON,

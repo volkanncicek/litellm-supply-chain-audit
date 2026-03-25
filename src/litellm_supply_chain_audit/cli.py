@@ -31,10 +31,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--pth-max-depth",
         type=int,
         default=4,
-        help=(
-            "Recursive litellm_init.pth search depth under scan_root "
-            "(default: 4; 0 disables)"
-        ),
+        help=("Recursive litellm_init.pth search depth under scan_root (default: 4; 0 disables)"),
     )
     p.add_argument(
         "--pth-max-hits",

@@ -117,7 +117,10 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
     )
     if config.pth_max_depth > 0 and root.is_dir():
         pth_slow = find_litellm_init_pth(
-            root, max_depth=config.pth_max_depth, max_hits=config.pth_max_hits, verbose=config.verbose
+            root,
+            max_depth=config.pth_max_depth,
+            max_hits=config.pth_max_hits,
+            verbose=config.verbose,
         )
     seen_pth: set[str] = set()
     pth_hits: list[dict] = []
