@@ -11,18 +11,24 @@ from pathlib import Path
 
 _SUPPORTED_MINOR_VERSIONS: tuple[str, ...] = ("10", "11", "12", "13", "14")
 
-_SITE_INFO_SCRIPT = r"""import json, site, sys
+_SITE_INFO_SCRIPT = r"""import json, sysconfig, sys
+
 paths = []
+for k in ("purelib", "platlib"):
+    p = sysconfig.get_path(k)
+    if p:
+        paths.append(p)
+
+# "user" scheme may not exist in some distributions; ignore failures.
 try:
-    paths.extend(site.getsitepackages())
+    for k in ("purelib", "platlib"):
+        p = sysconfig.get_path(k, scheme="user")
+        if p:
+            paths.append(p)
 except Exception:
     pass
-try:
-    u = site.getusersitepackages()
-    if u:
-        paths.append(u)
-except Exception:
-    pass
+
+# Note: we intentionally do NOT import `site` to avoid triggering any `.pth` files.
 print(json.dumps({"executable": sys.executable, "site_packages": paths}))
 """
 
@@ -30,7 +36,8 @@ print(json.dumps({"executable": sys.executable, "site_packages": paths}))
 def _safe_run_python(python: Path, timeout: float = 30.0) -> dict | None:
     try:
         proc = subprocess.run(
-            [str(python), "-c", _SITE_INFO_SCRIPT],
+            # -S disables importing `site` at startup; this avoids executing `.pth` files.
+            [str(python), "-S", "-c", _SITE_INFO_SCRIPT],
             capture_output=True,
             text=True,
             timeout=timeout,

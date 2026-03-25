@@ -32,8 +32,8 @@
 
 | # | Phase | This tool |
 |---|--------|-----------|
-| 1 | Environments | Heuristic discovery: `PATH` / Windows `py`, common prefixes, pyenv/conda/homebrew-style paths, explicit Python `3.10`–`3.14` install paths (including `Program Files` and `Program Files (x86)`), and `.venv` / `venv` / `env` / `.env` / `.virtualenv` / `.conda` under the scan root (not every niche layout). |
-| 2 | Installed packages | Reads `litellm-*.dist-info/METADATA` and `litellm-*.egg-info/PKG-INFO` only—**no `import litellm`**. Flags **1.82.7 / 1.82.8** and lists installed packages that declare `Requires-Dist: litellm`. |
+| 1 | Environments | Heuristic discovery: `PATH` / Windows `py`, common prefixes, pyenv/conda/homebrew-style paths, explicit Python `3.10`–`3.14` install paths (including `Program Files` and `Program Files (x86)`), and `.venv` / `venv` / `env` / `.env` / `.virtualenv` / `.conda` under the scan root (not every niche layout). Discovery runs Python with `-S` (no `site` import) to avoid executing any `.pth` side effects. |
+| 2 | Installed packages | Reads `litellm-*.dist-info/METADATA` and `litellm-*.egg-info/PKG-INFO` only—**no `import litellm`**. Flags **1.82.7 / 1.82.8** and also reports any installed package metadata that declares `Requires-Dist: litellm`. |
 | 3 | Manifests | `pyproject.toml` dependency tables; line scan of `requirements*.txt`, Pipfile, lockfiles, `setup.py` / `setup.cfg`, etc. |
 | 4 | pip / uv cache | Known cache locations; filenames suggesting **1.82.7 / 1.82.8** artifacts. |
 | 5 | `.pth` IOC | Fast: `litellm_init.pth` beside discovered `site-packages`; also checks common system Python locations. Optional **`--full-pth-walk`** under `scan_root` (slow). |
