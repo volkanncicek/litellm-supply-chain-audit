@@ -1,20 +1,18 @@
 """Search for malicious .pth IOC files."""
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 
-from .constants import MALICIOUS_DOMAIN, PTH_IOC_NAME
-
-_SUPPORTED_MINOR_VERSIONS: tuple[str, ...] = ("10", "11", "12", "13", "14")
+from .constants import (
+    FS_WALK_SKIP_DIRS_COMMON,
+    MALICIOUS_DOMAIN,
+    PTH_IOC_NAME,
+    SUPPORTED_PYTHON_MINOR_VERSIONS,
+)
 
 
 def _should_skip_dir(name: str) -> bool:
-    return name in {
-        ".git",
-        "node_modules",
-        "__pycache__",
+    extra = {
         ".npm",
         ".yarn",
         "Packages",
@@ -22,6 +20,7 @@ def _should_skip_dir(name: str) -> bool:
         "yarn",
         "Temp",
     }
+    return name in FS_WALK_SKIP_DIRS_COMMON or name in extra
 
 
 def find_pth_in_site_packages(site_package_dirs: list[str]) -> list[dict]:
@@ -129,7 +128,7 @@ def find_pth_in_system_locations(max_hits: int = 50) -> list[dict]:
     """
     roots: list[Path] = []
     if os.name == "nt":
-        versioned_roots = [Path(fr"C:\Python3{minor}") for minor in _SUPPORTED_MINOR_VERSIONS]
+        versioned_roots = [Path(rf"C:\Python3{minor}") for minor in SUPPORTED_PYTHON_MINOR_VERSIONS]
         roots.extend(
             [
                 *versioned_roots,

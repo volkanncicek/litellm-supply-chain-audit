@@ -1,7 +1,5 @@
 """CLI entrypoint."""
 
-from __future__ import annotations
-
 import argparse
 import json
 import sys
@@ -24,15 +22,19 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Directory to scan (default: user home)",
     )
     p.add_argument(
-        "--pth-max-depth",
+        "--venv-walk-depth",
         type=int,
         default=8,
-        help="Max depth for --full-pth-walk directory traversal (default: 8)",
+        help="Depth-limited venv discovery under scan_root via pyvenv.cfg (default: 8; 0 disables)",
     )
     p.add_argument(
-        "--full-pth-walk",
-        action="store_true",
-        help="Recursively search scan_root for litellm_init.pth (can be slow on large trees)",
+        "--pth-max-depth",
+        type=int,
+        default=4,
+        help=(
+            "Recursive litellm_init.pth search depth under scan_root "
+            "(default: 4; 0 disables)"
+        ),
     )
     p.add_argument("--no-docker", action="store_true", help="Skip Docker image name scan")
     p.add_argument("--no-processes", action="store_true", help="Skip process/socket scan")
@@ -67,8 +69,8 @@ def main(argv: list[str] | None = None) -> None:
 
     cfg = ScanConfig(
         scan_root=root,
+        venv_walk_depth=args.venv_walk_depth,
         pth_max_depth=args.pth_max_depth,
-        full_pth_walk=args.full_pth_walk,
         skip_docker=args.no_docker,
         skip_processes=args.no_processes,
     )

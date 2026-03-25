@@ -36,7 +36,7 @@
 | 2 | Installed packages | Reads `litellm-*.dist-info/METADATA` and `litellm-*.egg-info/PKG-INFO` only—**no `import litellm`**. Flags **1.82.7 / 1.82.8** and also reports any installed package metadata that declares `Requires-Dist: litellm`. |
 | 3 | Manifests | `pyproject.toml` dependency tables; line scan of `requirements*.txt`, Pipfile, lockfiles, `setup.py` / `setup.cfg`, etc. |
 | 4 | pip / uv cache | Known cache locations; filenames suggesting **1.82.7 / 1.82.8** artifacts. |
-| 5 | `.pth` IOC | Fast: `litellm_init.pth` beside discovered `site-packages`; also checks common system Python locations. Optional **`--full-pth-walk`** under `scan_root` (slow). |
+| 5 | `.pth` IOC | Fast: `litellm_init.pth` beside discovered `site-packages`; also checks common system Python locations. For deeper scanning under `scan_root`, set **`--pth-max-depth > 0`**. |
 | 6 | Processes / network | **psutil**: command lines mentioning `litellm`; connections to the known malicious host when the OS exposes them; plus `hosts` file IOC line check for `models.litellm.cloud`. |
 | 7 | Docker | **`docker image ls`**—name/tag match only; no layer inspection. Detects `litellm` tags containing **1.82.7 / 1.82.8** as danger. Skipped if the daemon is down; use **`--no-docker`** to skip the CLI call. |
 
@@ -47,7 +47,7 @@
 - **Discovery is heuristic**—not every Python on the disk is guaranteed to appear.
 - **Transitive dependencies** from manifests are **not** fully resolved; phase 2 is “what is installed,” not “what pip would resolve.”
 - **Manifest hit** = “litellm referenced,” not automatically a bad version (warnings use [exit codes](#exit-codes)).
-- **Network** listing may be empty without permissions; **Docker** still matches image **names/tags only** (not image layers); **`--full-pth-walk`** is limited to **`scan_root`** and depth.
+- **Network** listing may be empty without permissions; **Docker** still matches image **names/tags only** (not image layers); deeper `.pth` scanning is controlled by **`--pth-max-depth`**.
 
 ---
 
@@ -106,8 +106,8 @@ litellm-supply-chain-audit /path/to/projects
 # JSON only
 litellm-supply-chain-audit --json-only
 
-# Slow: recursive search for litellm_init.pth
-litellm-supply-chain-audit /path/to/root --full-pth-walk
+# Optional: deeper recursive search for litellm_init.pth under scan_root
+litellm-supply-chain-audit /path/to/root --pth-max-depth 8
 
 litellm-supply-chain-audit --no-processes --no-docker
 ```
@@ -117,8 +117,8 @@ litellm-supply-chain-audit --no-processes --no-docker
 | Option | Description |
 |--------|-------------|
 | `scan_root` | Optional; default: user home |
-| `--pth-max-depth N` | Max depth for `--full-pth-walk` (default **8**) |
-| `--full-pth-walk` | Recursive `litellm_init.pth` search under `scan_root` |
+| `--venv-walk-depth N` | Depth-limited venv discovery under `scan_root` via `pyvenv.cfg` (default **8**; `0` disables) |
+| `--pth-max-depth N` | Recursive `litellm_init.pth` search depth under `scan_root` (default **4**; `0` disables) |
 | `--no-docker` | Skip Docker |
 | `--no-processes` | Skip process/socket phase |
 | `--json-only` | Print JSON only |

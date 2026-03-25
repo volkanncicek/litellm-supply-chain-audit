@@ -1,7 +1,5 @@
 """Process and network IOC checks via psutil."""
 
-from __future__ import annotations
-
 from typing import Any
 
 import psutil

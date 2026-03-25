@@ -1,7 +1,5 @@
 """List local Docker images whose names/tags suggest litellm."""
 
-from __future__ import annotations
-
 import re
 import subprocess
 from typing import Any

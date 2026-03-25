@@ -1,7 +1,5 @@
 """Scan pip / uv download caches for compromised wheel/sdist names."""
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 

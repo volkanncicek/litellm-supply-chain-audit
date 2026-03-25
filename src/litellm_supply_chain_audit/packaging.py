@@ -1,7 +1,5 @@
 """Parse installed distribution metadata without importing packages."""
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
 

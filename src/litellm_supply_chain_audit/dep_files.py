@@ -1,30 +1,12 @@
 """Scan project manifests for litellm references."""
 
-from __future__ import annotations
-
 import os
 import re
 import tomllib
 from pathlib import Path
 
-from .constants import PACKAGE_NAME
+from .constants import DEPENDENCY_MANIFEST_FILE_NAMES, FS_WALK_SKIP_DIRS_COMMON, PACKAGE_NAME
 
-_DEP_FILE_NAMES = frozenset(
-    {
-        "requirements.txt",
-        "requirements-dev.txt",
-        "requirements_dev.txt",
-        "constraints.txt",
-        "Pipfile",
-        "Pipfile.lock",
-        "poetry.lock",
-        "uv.lock",
-        "setup.py",
-        "setup.cfg",
-        "environment.yml",
-        "environment.yaml",
-    }
-)
 # PEP 508 name at start of requirement line
 _RE_REQ = re.compile(rf"(?i)^{re.escape(PACKAGE_NAME)}([\s\[<>=!~,;]|$)")
 
@@ -106,17 +88,16 @@ def scan_dependency_files(root: Path, max_files: int = 5000) -> list[dict]:
     """
     findings: list[dict] = []
     count = 0
-    skip_dirs = {".git", "node_modules", "__pycache__", ".tox", "dist", "build"}
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        dirnames[:] = [d for d in dirnames if d not in FS_WALK_SKIP_DIRS_COMMON]
         for name in filenames:
             if count >= max_files:
                 return findings
 
             is_candidate = (
                 name == "pyproject.toml"
-                or name in _DEP_FILE_NAMES
+                or name in DEPENDENCY_MANIFEST_FILE_NAMES
                 or (name.startswith("requirements") and name.endswith(".txt"))
                 or (
                     name.startswith("conda-env")

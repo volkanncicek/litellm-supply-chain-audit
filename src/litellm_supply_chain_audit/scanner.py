@@ -1,7 +1,5 @@
 """Orchestrate all scan phases and compute exit code."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -10,22 +8,30 @@ from typing import Any
 
 from . import __version__
 from .cache_scan import scan_package_caches
-from .constants import COMPROMISED_VERSIONS, MALICIOUS_DOMAIN, remote_endpoint_matches_malicious_ioc
+from .constants import (
+    COMPROMISED_VERSIONS,
+    MALICIOUS_DOMAIN,
+    PRODUCT_NAME,
+    remote_endpoint_matches_malicious_ioc,
+)
 from .dep_files import scan_dependency_files
 from .discovery import discover_environments
 from .docker_scan import scan_docker_images
 from .installed import scan_indirect_dependency_in_environments, scan_installed_in_environments
-from .ioc import find_litellm_init_pth, find_pth_in_site_packages, find_pth_in_system_locations, scan_hosts_file_for_ioc
+from .ioc import (
+    find_litellm_init_pth,
+    find_pth_in_site_packages,
+    find_pth_in_system_locations,
+    scan_hosts_file_for_ioc,
+)
 from .processes import scan_processes_and_network
-
-PRODUCT_NAME = "litellm-supply-chain-audit"
 
 
 @dataclass
 class ScanConfig:
     scan_root: Path
-    pth_max_depth: int = 8
-    full_pth_walk: bool = False
+    pth_max_depth: int = 4
+    venv_walk_depth: int = 8
     skip_docker: bool = False
     skip_processes: bool = False
 
@@ -61,7 +67,7 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
 
     phases: dict[str, Any] = {}
 
-    envs = discover_environments(scan_roots=scan_roots)
+    envs = discover_environments(scan_roots=scan_roots, venv_walk_depth=config.venv_walk_depth)
     phases["python_environments"] = {"count": len(envs), "environments": envs}
 
     installed = scan_installed_in_environments(envs)
@@ -82,7 +88,7 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
     pth_fast = find_pth_in_site_packages(site_dirs)
     pth_slow: list[dict] = []
     pth_system = find_pth_in_system_locations()
-    if config.full_pth_walk and root.is_dir():
+    if config.pth_max_depth > 0 and root.is_dir():
         pth_slow = find_litellm_init_pth(root, max_depth=config.pth_max_depth)
     seen_pth: set[str] = set()
     pth_hits: list[dict] = []
@@ -108,7 +114,7 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
 
     hosts = scan_hosts_file_for_ioc()
     phases["hosts_ioc"] = hosts
-    hosts_ioc = bool((hosts.get("matched_lines") or []))
+    hosts_ioc = bool(hosts.get("matched_lines") or [])
 
     docker_danger = False
     if not config.skip_docker:

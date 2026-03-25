@@ -1,7 +1,5 @@
 """Scan site-packages trees for installed litellm versions."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from .constants import COMPROMISED_VERSIONS

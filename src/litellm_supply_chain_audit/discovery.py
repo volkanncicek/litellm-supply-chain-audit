@@ -1,7 +1,5 @@
 """Discover Python executables and their site-packages paths."""
 
-from __future__ import annotations
-
 import json
 import os
 import shutil
@@ -9,7 +7,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SUPPORTED_MINOR_VERSIONS: tuple[str, ...] = ("10", "11", "12", "13", "14")
+from .constants import (
+    CONDA_HOME_DIR_NAMES,
+    PROJECT_VENV_DIR_NAMES,
+    SUPPORTED_PYTHON_MINOR_VERSIONS,
+    VENV_WALK_SKIP_DIRS,
+)
 
 _SITE_INFO_SCRIPT = r"""import json, sysconfig, sys
 
@@ -28,7 +31,7 @@ try:
 except Exception:
     pass
 
-# Note: we intentionally do NOT import `site` to avoid triggering any `.pth` files.
+# Don't import `site` (avoid executing `.pth`).
 print(json.dumps({"executable": sys.executable, "site_packages": paths}))
 """
 
@@ -78,19 +81,19 @@ def _windows_python_candidates() -> list[Path]:
             found.extend(base.rglob("python.exe"))
     pf = os.environ.get("ProgramFiles", "")
     if pf:
-        for minor in _SUPPORTED_MINOR_VERSIONS:
+        for minor in SUPPORTED_PYTHON_MINOR_VERSIONS:
             name = f"Python3{minor}"
             p = Path(pf) / name / "python.exe"
             if p.is_file():
                 found.append(p)
     pf86 = os.environ.get("ProgramFiles(x86)", "")
     if pf86:
-        for minor in _SUPPORTED_MINOR_VERSIONS:
+        for minor in SUPPORTED_PYTHON_MINOR_VERSIONS:
             name = f"Python3{minor}"
             p = Path(pf86) / name / "python.exe"
             if p.is_file():
                 found.append(p)
-    for name in ("miniconda3", "anaconda3", "mambaforge", "miniforge3"):
+    for name in CONDA_HOME_DIR_NAMES:
         home = Path.home() / name / "python.exe"
         if home.is_file():
             found.append(home)
@@ -118,7 +121,8 @@ def _unix_python_candidates() -> list[Path]:
                     p = d / name
                     if p.is_file() and os.access(p, os.X_OK):
                         found.append(p)
-    for conda in (home / "miniconda3", home / "anaconda3", home / "mambaforge"):
+    for name in CONDA_HOME_DIR_NAMES:
+        conda = home / name
         p = conda / "bin" / "python"
         if p.is_file():
             found.append(p)
@@ -144,14 +148,14 @@ def _unix_python_candidates() -> list[Path]:
 
 
 def _posix_std_interpreters() -> list[Path]:
-    """Common Homebrew / Linux locations (macOS arm64/x86_64 and typical distros)."""
+    """Common system locations."""
     candidates: list[str] = [
         "/opt/homebrew/bin/python3",
         "/usr/local/bin/python3",
         "/usr/bin/python3",
         "/usr/bin/python",
     ]
-    for minor in _SUPPORTED_MINOR_VERSIONS:
+    for minor in SUPPORTED_PYTHON_MINOR_VERSIONS:
         candidates.append(f"/opt/homebrew/bin/python3.{minor}")
         candidates.append(f"/usr/local/opt/python@3.{minor}/bin/python3")
     out: list[Path] = []
@@ -206,33 +210,10 @@ def _which_pythons() -> list[Path]:
     return out
 
 
-def collect_python_candidates(extra_roots: list[Path] | None = None) -> list[Path]:
-    """Collect likely Python executables (heuristic, not exhaustive)."""
-    candidates: list[Path] = [Path(sys.executable)]
-    candidates.extend(_which_pythons())
-    if os.name == "nt":
-        candidates.extend(_windows_python_candidates())
-        candidates.extend(_py_launcher_list())
-    else:
-        candidates.extend(_unix_python_candidates())
-
-    if extra_roots:
-        for root in extra_roots:
-            candidates.extend(_venv_pythons_under(root))
-            try:
-                for child in root.iterdir():
-                    if child.is_dir():
-                        candidates.extend(_venv_pythons_under(child))
-            except OSError:
-                pass
-
-    return _dedupe_paths(candidates)
-
-
-def _venv_pythons_under(root: Path) -> list[Path]:
-    """Typical project venv layouts only (avoids expensive full-tree rglob)."""
+def _venv_pythons_shallow(root: Path) -> list[Path]:
+    """Common project venv layouts."""
     found: list[Path] = []
-    for name in (".venv", "venv", "env", ".env", ".virtualenv", ".conda"):
+    for name in PROJECT_VENV_DIR_NAMES:
         if os.name == "nt":
             p = root / name / "Scripts" / "python.exe"
             if p.is_file():
@@ -247,12 +228,81 @@ def _venv_pythons_under(root: Path) -> list[Path]:
     return found
 
 
-def discover_environments(scan_roots: list[Path] | None = None) -> list[dict]:
+def _find_venv_pythons_by_pyvenv_cfg(
+    root: Path,
+    max_depth: int,
+    max_hits: int = 3000,
+) -> list[Path]:
+    """
+    Find venv interpreters by locating `pyvenv.cfg` under `root` up to `max_depth`.
+    This catches venvs regardless of directory name.
+    """
+    if max_depth <= 0:
+        return []
+    root = root.resolve()
+    found: list[Path] = []
+
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+        cur = Path(dirpath)
+        try:
+            rel = cur.relative_to(root)
+            depth = len(rel.parts)
+        except ValueError:
+            depth = 0
+
+        if depth >= max_depth:
+            dirnames[:] = []
+        else:
+            dirnames[:] = [d for d in dirnames if d not in VENV_WALK_SKIP_DIRS]
+
+        if "pyvenv.cfg" not in filenames:
+            continue
+
+        if os.name == "nt":
+            py = cur / "Scripts" / "python.exe"
+        else:
+            py = cur / "bin" / "python3"
+            if not py.is_file():
+                py = cur / "bin" / "python"
+
+        if py.is_file():
+            found.append(py)
+            if len(found) >= max_hits:
+                return found
+
+    return found
+
+
+def collect_python_candidates(
+    extra_roots: list[Path] | None = None,
+    venv_walk_depth: int = 8,
+) -> list[Path]:
+    """Collect likely Python executables (heuristic, not exhaustive)."""
+    candidates: list[Path] = [Path(sys.executable)]
+    candidates.extend(_which_pythons())
+    if os.name == "nt":
+        candidates.extend(_windows_python_candidates())
+        candidates.extend(_py_launcher_list())
+    else:
+        candidates.extend(_unix_python_candidates())
+
+    if extra_roots:
+        for root in extra_roots:
+            candidates.extend(_venv_pythons_shallow(root))
+            candidates.extend(_find_venv_pythons_by_pyvenv_cfg(root, max_depth=venv_walk_depth))
+
+    return _dedupe_paths(candidates)
+
+
+def discover_environments(
+    scan_roots: list[Path] | None = None,
+    venv_walk_depth: int = 8,
+) -> list[dict]:
     """
     Return list of { "python": str, "site_packages": [str, ...] } for each working interpreter.
     """
     roots = [r.resolve() for r in (scan_roots or []) if r.is_dir()]
-    candidates = collect_python_candidates(extra_roots=roots)
+    candidates = collect_python_candidates(extra_roots=roots, venv_walk_depth=venv_walk_depth)
     envs: list[dict] = []
     seen_sp: set[str] = set()
 
