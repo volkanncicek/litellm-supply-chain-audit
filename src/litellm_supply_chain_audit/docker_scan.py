@@ -54,7 +54,14 @@ def scan_docker_images(timeout_seconds: float = 15.0) -> dict[str, Any]:
         }
 
     lines = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
-    hits = [ln for ln in lines if "litellm" in ln.lower()]
+    hits: list[str] = []
+    for ln in lines:
+        low = ln.lower()
+        # Avoid dangling/noise entries like "<none>:<none>".
+        if low == "<none>:<none>":
+            continue
+        if "litellm" in low:
+            hits.append(ln)
     compromised: list[str] = []
     for image in hits:
         low = image.lower()

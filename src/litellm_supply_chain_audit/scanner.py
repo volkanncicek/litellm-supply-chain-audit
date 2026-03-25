@@ -131,7 +131,7 @@ def run_scan(config: ScanConfig) -> tuple[dict[str, Any], int]:
 
     net_danger = False
     if not config.skip_processes:
-        _log("[6/9] Scan processes / network...")
+        _log("[6/8] Scan processes / network...")
         proc = scan_processes_and_network()
         phases["processes_and_network"] = proc
         if proc.get("status") == "ok":
@@ -204,10 +204,10 @@ def report_to_text(report: dict[str, Any]) -> str:
 
     phases = report.get("phases") or {}
     envs = phases.get("python_environments") or {}
-    lines.append(f"[1/7] Python environments: {envs.get('count', 0)}")
+    lines.append(f"[1/8] Python environments: {envs.get('count', 0)}")
 
     inst = phases.get("installed_litellm") or []
-    lines.append(f"[2/7] Installed litellm: {len(inst)}")
+    lines.append(f"[2/8] Installed litellm: {len(inst)}")
     for row in inst[:20]:
         lines.append(
             f"  - {row.get('litellm_version')} @ {row.get('site_packages')}"
@@ -215,7 +215,7 @@ def report_to_text(report: dict[str, Any]) -> str:
         )
 
     deps = phases.get("dependency_files") or []
-    lines.append(f"[3/7] Dependency files referencing litellm: {len(deps)}")
+    lines.append(f"[3/8] Dependency files referencing litellm: {len(deps)}")
     for row in deps[:15]:
         raw = row.get("path") or row.get("relative") or ""
         try:
@@ -231,32 +231,31 @@ def report_to_text(report: dict[str, Any]) -> str:
         lines.append(f"        - {row.get('package')} ({row.get('python')})")
 
     cache = phases.get("pip_uv_cache") or []
-    lines.append(f"[4/7] pip/uv/Poetry/Hatch cache (suspicious filenames): {len(cache)}")
+    lines.append(f"[4/8] pip/uv/Poetry/Hatch cache (suspicious filenames): {len(cache)}")
 
     pth = phases.get("pth_ioc") or []
-    lines.append(f"[5/7] litellm_init.pth IOC: {len(pth)}")
+    lines.append(f"[5/8] litellm_init.pth IOC: {len(pth)}")
     for row in pth[:10]:
         lines.append(
             f"  - {row.get('path')} suspicious_domain={row.get('suspicious_domain_present')}"
         )
 
     proc = phases.get("processes_and_network") or {}
-    lines.append(f"[6/7] Processes / network: {proc.get('status', '?')}")
+    lines.append(f"[6/8] Processes / network: {proc.get('status', '?')}")
     if proc.get("status") == "skipped" and proc.get("reason"):
         pr = " ".join(str(proc["reason"]).split())
         if len(pr) > 220:
             pr = pr[:217] + "..."
         lines.append(f"      note: {pr}")
 
-    hosts = phases.get("hosts_ioc") or {}
-    if hosts.get("status") == "ok":
-        host_hits = hosts.get("matched_lines") or []
-        lines.append(f"      hosts IOC lines: {len(host_hits)}")
-        for ln in host_hits[:5]:
-            lines.append(f"        - {ln}")
-
     dock = phases.get("docker") or {}
-    lines.append(f"[7/7] Docker: {dock.get('status', '?')}")
+    hosts = phases.get("hosts_ioc") or {}
+    host_hits = hosts.get("matched_lines") or []
+    lines.append(f"[7/8] Hosts file IOC: {len(host_hits)}")
+    for ln in (host_hits or [])[:5]:
+        lines.append(f"  - {ln}")
+
+    lines.append(f"[8/8] Docker: {dock.get('status', '?')}")
     if dock.get("status") in ("error", "skipped") and dock.get("reason"):
         r = " ".join(str(dock["reason"]).split())
         if len(r) > 220:
