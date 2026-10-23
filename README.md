@@ -72,6 +72,12 @@
 
 ## Install
 
+**One-off run — uvx** (no clone, nothing added to PATH)
+
+```bash
+uvx --from git+https://github.com/volkanncicek/litellm-supply-chain-audit litellm-supply-chain-audit
+```
+
 **Recommended — uv**
 
 ```bash
