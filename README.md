@@ -28,17 +28,18 @@
 
 ---
 
-## What the scan does (7 phases)
+## What the scan does (8 phases)
 
 | # | Phase | This tool |
 |---|--------|-----------|
-| 1 | Environments | Heuristic discovery: `PATH` / Windows `py`, common prefixes, pyenv/conda/homebrew-style paths, explicit Python `3.10`–`3.14` install paths (including `Program Files` and `Program Files (x86)`), and `.venv` / `venv` / `env` / `.env` / `.virtualenv` / `.conda` under the scan root (not every niche layout). Discovery runs Python with `-S` (no `site` import) to avoid executing any `.pth` side effects. |
+| 1 | Environments | Heuristic discovery: `PATH` / Windows `py`, common prefixes, pyenv/conda/homebrew-style paths, explicit Python `3.10`–`3.14` install paths (including `Program Files` and `Program Files (x86)`), and `.venv` / `venv` / `env` / `.virtualenv` / `.conda` under the scan root (not every niche layout). Discovery runs Python with `-S` (no `site` import) to avoid executing any `.pth` side effects. |
 | 2 | Installed packages | Reads `litellm-*.dist-info/METADATA` and `litellm-*.egg-info/PKG-INFO` only—**no `import litellm`**. Flags **1.82.7 / 1.82.8** and also reports any installed package metadata that declares `Requires-Dist: litellm`. |
 | 3 | Manifests | `pyproject.toml` dependency tables; line scan of `requirements*.txt`, Pipfile, lockfiles, `setup.py` / `setup.cfg`, etc. |
 | 4 | pip / uv / Poetry / Hatch cache | Known cache locations; filenames suggesting **1.82.7 / 1.82.8** artifacts. |
 | 5 | `.pth` IOC | Fast: `litellm_init.pth` beside discovered `site-packages`; also checks common system Python locations. For deeper scanning under `scan_root`, set **`--pth-max-depth > 0`**. |
-| 6 | Processes / network | **psutil**: command lines mentioning `litellm`; connections to the known malicious host when the OS exposes them; plus `hosts` file IOC line check for `models.litellm.cloud`. |
-| 7 | Docker | **`docker image ls`**—name/tag match only; no layer inspection. Detects `litellm` tags containing **1.82.7 / 1.82.8** as danger. Skipped if the daemon is down; use **`--no-docker`** to skip the CLI call. |
+| 6 | Processes / network | **psutil**: command lines mentioning `litellm`; connections to the known malicious host when the OS exposes them. |
+| 7 | Hosts file | `hosts` file lines pointing at `models.litellm.cloud`. |
+| 8 | Docker | **`docker image ls`**—name/tag match only; no layer inspection. Detects `litellm` tags containing **1.82.7 / 1.82.8** as danger. Skipped if the daemon is down; use **`--no-docker`** to skip the CLI call. |
 
 ---
 
@@ -58,7 +59,7 @@
 | **Windows** | Native paths, `py` launcher, `%LOCALAPPDATA%` installs. |
 | **macOS / Linux** | Standard layouts and user cache paths. |
 
-**psutil** is required (phase 6). **Docker CLI** is optional (phase 7).
+**psutil** is required (phase 6). **Docker CLI** is optional (phase 8).
 
 ---
 
