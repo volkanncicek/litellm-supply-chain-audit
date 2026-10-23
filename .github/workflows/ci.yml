@@ -14,6 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        # Empty runs the floor from .python-version; the second entry is the newest supported.
+        python: ["", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
       # Actions are pinned by commit SHA: this repo exists because a tag was trusted.
@@ -21,6 +23,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
       - run: uv sync --locked
       - run: uvx ruff check .
       - run: uv run pytest -q
